@@ -5,5 +5,5 @@
   "author": {
     "name": "inonego"
   },
-  "skills": ["./skills/csharp-conventions", "./skills/progressive-planning"]
+  "skills": ["./skills/csharp-conventions", "./skills/progressive-planning", "./skills/general-programming"]
 }
