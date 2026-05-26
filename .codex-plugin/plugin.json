@@ -1,0 +1,27 @@
+{
+  "name": "inonego-skills",
+  "version": "1.0.0+codex.20260602054035",
+  "description": "inonego의 Codex 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
+  "author": {
+    "name": "inonego"
+  },
+  "keywords": [
+    "inonego-skills"
+  ],
+  "interface": {
+    "displayName": "Inonego Skills",
+    "shortDescription": "inonego의 Codex 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
+    "longDescription": "inonego의 Codex 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
+    "developerName": "inonego",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [],
+    "brandColor": "#3B82F6",
+    "screenshots": []
+  },
+  "skills": "./skills/"
+}
