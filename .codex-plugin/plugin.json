@@ -1,7 +1,7 @@
 {
   "name": "inonego-skills",
-  "version": "1.0.0+codex.20260609104050",
-  "description": "inonego의 Codex 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
+  "version": "1.0.0+codex.20260614150833",
+  "description": "inonego\uc758 Codex \uc2a4\ud0ac \ubaa8\uc74c. C# \ucee8\ubca4\uc158, Unity \uac1c\ubc1c \uaddc\uce59 \ub4f1\uc744 \ud3ec\ud568\ud569\ub2c8\ub2e4.",
   "author": {
     "name": "inonego"
   },
@@ -10,8 +10,8 @@
   ],
   "interface": {
     "displayName": "Inonego Skills",
-    "shortDescription": "inonego의 Codex 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
-    "longDescription": "inonego의 Codex 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
+    "shortDescription": "inonego\uc758 Codex \uc2a4\ud0ac \ubaa8\uc74c. C# \ucee8\ubca4\uc158, Unity \uac1c\ubc1c \uaddc\uce59 \ub4f1\uc744 \ud3ec\ud568\ud569\ub2c8\ub2e4.",
+    "longDescription": "inonego\uc758 Codex \uc2a4\ud0ac \ubaa8\uc74c. C# \ucee8\ubca4\uc158, Unity \uac1c\ubc1c \uaddc\uce59 \ub4f1\uc744 \ud3ec\ud568\ud569\ub2c8\ub2e4.",
     "developerName": "inonego",
     "category": "Productivity",
     "capabilities": [
