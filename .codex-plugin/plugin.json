@@ -1,6 +1,6 @@
 {
   "name": "inonego-skills",
-  "version": "1.0.0+codex.20260602054035",
+  "version": "1.0.0+codex.20260609104050",
   "description": "inonego의 Codex 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
   "author": {
     "name": "inonego"
