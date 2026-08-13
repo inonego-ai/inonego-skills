@@ -5,15 +5,15 @@
     "name": "inonego"
   },
   "metadata": {
-    "description": "inonego의 Claude Code 스킬 모음",
-    "version": "1.0.0"
+    "description": "inonego의 작업 계획과 개발 스킬 모음",
+    "version": "1.1.0"
   },
   "plugins": [
     {
       "name": "inonego-skills",
       "source": "./",
-      "description": "inonego의 Claude Code 스킬 모음",
-      "version": "1.0.0",
+      "description": "inonego의 작업 계획과 개발 스킬 모음",
+      "version": "1.1.0",
       "author": {
         "name": "inonego"
       },

@@ -1,0 +1,62 @@
+{
+  "description": "압축 복구, 코드 컨벤션 재로딩, 종료 전 완료 대조를 위한 최소 훅",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^compact$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/inonego_guard.py\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"python (Join-Path $env:PLUGIN_ROOT 'hooks/inonego_guard.py')\"",
+            "timeout": 5,
+            "statusMessage": "작업 기준을 복구하는 중",
+            "additionalContextLimit": 600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/inonego_guard.py\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"python (Join-Path $env:PLUGIN_ROOT 'hooks/inonego_guard.py')\"",
+            "timeout": 5,
+            "statusMessage": "코드 작업 경계를 확인하는 중",
+            "additionalContextLimit": 600
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/inonego_guard.py\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"python (Join-Path $env:PLUGIN_ROOT 'hooks/inonego_guard.py')\"",
+            "timeout": 5,
+            "statusMessage": "작업 상태를 기록하는 중"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/inonego_guard.py\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"python (Join-Path $env:PLUGIN_ROOT 'hooks/inonego_guard.py')\"",
+            "timeout": 5,
+            "statusMessage": "요청 완료 여부를 대조하는 중"
+          }
+        ]
+      }
+    ]
+  }
+}

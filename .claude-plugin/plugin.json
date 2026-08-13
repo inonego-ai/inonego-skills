@@ -1,9 +1,15 @@
 {
   "name": "inonego-skills",
-  "description": "inonego의 Claude Code 스킬 모음. C# 컨벤션, Unity 개발 규칙 등을 포함합니다.",
-  "version": "1.0.0",
+  "description": "inonego의 작업 계획, 프로그래밍, 테스트 설계, Unity 개발 스킬 모음입니다.",
+  "version": "1.1.0",
   "author": {
     "name": "inonego"
   },
-  "skills": ["./skills/progressive-planning", "./skills/programmer"]
+  "skills": [
+    "./skills/planning",
+    "./skills/programmer",
+    "./skills/test-design",
+    "./skills/dev-unity",
+    "./skills/target-state-implementation"
+  ]
 }

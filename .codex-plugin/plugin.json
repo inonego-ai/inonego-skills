@@ -1,7 +1,7 @@
 {
   "name": "inonego-skills",
-  "version": "1.0.0+codex.20260730170417",
-  "description": "inonego\uc758 Codex \uc2a4\ud0ac \ubaa8\uc74c. C# \ucee8\ubca4\uc158, Unity \uac1c\ubc1c \uaddc\uce59 \ub4f1\uc744 \ud3ec\ud568\ud569\ub2c8\ub2e4.",
+  "version": "1.0.0+codex.20260813120622",
+  "description": "inonego\uc758 \uc791\uc5c5 \uacc4\ud68d, \ud504\ub85c\uadf8\ub798\ubc0d, \ud14c\uc2a4\ud2b8 \uc124\uacc4, Unity \uac1c\ubc1c \uc2a4\ud0ac \ubaa8\uc74c\uc785\ub2c8\ub2e4.",
   "author": {
     "name": "inonego"
   },
@@ -10,8 +10,8 @@
   ],
   "interface": {
     "displayName": "Inonego Skills",
-    "shortDescription": "inonego\uc758 Codex \uc2a4\ud0ac \ubaa8\uc74c. C# \ucee8\ubca4\uc158, Unity \uac1c\ubc1c \uaddc\uce59 \ub4f1\uc744 \ud3ec\ud568\ud569\ub2c8\ub2e4.",
-    "longDescription": "inonego\uc758 Codex \uc2a4\ud0ac \ubaa8\uc74c. C# \ucee8\ubca4\uc158, Unity \uac1c\ubc1c \uaddc\uce59 \ub4f1\uc744 \ud3ec\ud568\ud569\ub2c8\ub2e4.",
+    "shortDescription": "\uc791\uc5c5 \uacc4\ud68d\uacfc \uac1c\ubc1c \uae30\uc900\uc744 \uc77c\uad00\ub418\uac8c \uc801\uc6a9\ud569\ub2c8\ub2e4.",
+    "longDescription": "\uc0ac\uc6a9\uc790 \uc694\uad6c\uc640 \ud6c4\uc18d \uad50\uc815\uc744 \uae30\uc900\uc73c\ub85c \uacc4\ud68d, \ud504\ub85c\uadf8\ub798\ubc0d, \ud14c\uc2a4\ud2b8 \uc124\uacc4, Unity \uac1c\ubc1c \uc791\uc5c5\uc744 \uc77c\uad00\ub418\uac8c \uc218\ud589\ud558\ub3c4\ub85d \ub3d5\uc2b5\ub2c8\ub2e4.",
     "developerName": "inonego",
     "category": "Productivity",
     "capabilities": [
