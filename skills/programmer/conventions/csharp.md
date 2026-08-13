@@ -26,6 +26,14 @@ Unity C#.
 - 같은 프로젝트의 하위 네임스페이스는 namespace 블록 내부에서 상대 이름으로 선언할 수 있다.
 
 ```csharp
+/* BLOCK_HEADER_BEGIN =======================================================================
+파일명 : Example.cs
+수정일 : YYYY-MM-DD
+
+# 설명
+코드 스타일 규칙을 한 파일에 적용한 예시다.
+========================================================================= BLOCK_HEADER_END */
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -267,6 +275,14 @@ namespace inonego
 구체적인 판단은 위의 `규칙 설명`을 따른다.
 
 ```csharp
+/* BLOCK_HEADER_BEGIN =======================================================================
+파일명 : Example.cs
+수정일 : YYYY-MM-DD
+
+# 설명
+코드 스타일 규칙을 한 파일에 적용한 예시다.
+========================================================================= BLOCK_HEADER_END */
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -405,7 +421,10 @@ namespace inonego
         /// 기본 생성자.
         /// </summary>
         // ------------------------------------------------------------
-        public Example() : base() {}
+        public Example() : base()
+        {
+            // NONE
+        }
 
         // ------------------------------------------------------------
         /// <summary>
