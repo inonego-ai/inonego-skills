@@ -105,6 +105,114 @@ frontmatter의 `name`, `description`을 중심으로 현재 요청과의 관련�
 
 여러 영역이 동시에 필요한 작업이면 최소한의 관련 스킬 조합을 선택한다.
 
+## Desktop Commander 성능 및 도구 사용 원칙
+
+Desktop Commander를 사용하는 로컬 작업에서는 정확성을 유지하면서 프로세스 생성 횟수, 도구 왕복 횟수, 파일 탐색 범위, 반환 데이터 양을 최소화한다.
+
+### 전용 도구 우선
+
+셸보다 Desktop Commander 전용 기능을 우선한다.
+
+- 파일 읽기: `read_file`, `read_multiple_files`
+- 디렉터리 조회: `list_directory`
+- 파일/내용 검색: `start_search`
+- 파일 수정: `edit_block`
+- 파일 생성/추가: `write_file`
+- 실행 중인 명령 출력 확인: `read_process_output`
+
+`Get-Content`, `Get-ChildItem`, `Get-ChildItem -Recurse`, `Select-String`, `Set-Content`, `Add-Content` 등으로 전용 Desktop Commander 기능을 대체하지 않는다.
+파일 조회·검색·편집을 위해 셸 프로세스를 만들지 않는다.
+
+### 셸 사용과 선택
+
+`start_process`는 Git, 빌드, 테스트, 패키지 관리자, Unity CLI 등 실제 CLI 프로그램 실행이나 Desktop Commander 전용 도구로 표현하기 어려운 시스템 작업에만 사용한다.
+
+Windows라는 이유만으로 PowerShell을 기본 선택하지 않는다.
+단순 CLI 실행은 가능한 경우 `shell: "cmd.exe"`를 명시해 가벼운 셸을 우선한다.
+
+PowerShell 고유 기능이 실제로 필요한 경우에만 PowerShell을 사용한다.
+사용자 PowerShell profile에 의존해야 하는 명확한 이유가 없다면 반드시 `-NoProfile`로 실행한다.
+
+```text
+powershell.exe -NoProfile -Command "..."
+```
+
+자동화 작업에서는 Conda 등 사용자 interactive shell 초기화를 불필요하게 실행하지 않는다.
+
+도구 선택 우선순위는 다음과 같다.
+
+1. Desktop Commander 전용 도구
+2. 직접 실행 가능한 CLI 또는 `cmd.exe`
+3. `powershell.exe -NoProfile`
+4. 사용자 profile이 실제로 필요한 PowerShell
+
+### 프로세스 생성과 도구 왕복 최소화
+
+여러 개의 작은 `start_process` 호출을 연속 생성하지 않는다.
+같은 목적의 CLI 상태 확인이나 검증은 오류 처리와 출력이 과도하게 복잡해지지 않는 범위에서 하나의 프로세스 실행으로 묶는다.
+
+여러 파일이 필요하면 개별 `read_file` 반복보다 `read_multiple_files`를 우선한다.
+서로 관련된 여러 검색 패턴은 가능하면 한 번의 범위 제한 검색으로 처리한다.
+
+이미 존재하는 interactive process를 안전하게 재사용할 수 있다면 새 프로세스를 반복 생성하지 않는다.
+필요 없어진 장기 실행 세션은 방치하지 않는다.
+
+### 탐색 범위 제한
+
+저장소 또는 프로젝트 루트 전체를 기본 검색 범위로 사용하지 않는다.
+먼저 예상되는 소스 디렉터리와 파일 형식을 제한한 뒤 검색한다.
+
+Unity 프로젝트의 일반 소스 조사에서는 다음 경로를 재귀 검색하지 않는다.
+
+- `Library`
+- `Temp`
+- `obj`
+- `Logs`
+- `Build`
+- `Builds`
+- `.git`
+
+Unity 작업에서는 필요한 범위에 따라 우선 `Assets`, `Packages`, `ProjectSettings`, `External` 영역을 사용한다.
+`Get-ChildItem -Recurse`를 저장소 전체에 실행하지 않는다.
+
+### 무거운 시스템 조회 제한
+
+`Get-CimInstance`, WMI 등 상대적으로 비싼 시스템 전체 조회를 일반적인 상태 확인에 습관적으로 사용하지 않는다.
+전용 프로세스·파일 도구나 더 좁은 명령으로 확인할 수 있으면 그것을 우선한다.
+시스템 전체 inventory는 실제로 필요한 경우에만 수행한다.
+
+### 반복 조회 방지
+
+작업 중 상태가 변경되지 않았다면 `CHATGPT_WEB_BOOTSTRAP.md`, 전역·프로젝트 `AGENTS.md`, 이미 선택해 로드한 `SKILL.md`, 프로젝트 루트와 기본 구조, 같은 파일의 동일 범위, Desktop Commander config, 동일한 Git 상태를 반복해서 확인하지 않는다.
+상태가 변경된 경우나 검증 단계에서 필요한 경우에만 다시 확인한다.
+
+### 파일 읽기와 출력량 최소화
+
+같은 파일을 짧은 범위로 여러 번 반복해서 읽는 패턴을 피한다.
+검색으로 위치를 먼저 특정한 뒤 필요한 주변 문맥을 한 번에 읽거나, 처음부터 필요한 범위를 합리적으로 넓게 읽는다.
+전체 파일이 필요한 근거가 없으면 큰 파일 전체를 읽지 않는다.
+
+프로세스 목록, 검색 결과, 로그, Git diff 등 대량 데이터를 그대로 반환받지 않는다.
+가능하면 로컬에서 먼저 경로, 파일 형식, 검색 조건, 결과 개수, line range를 제한한 뒤 필요한 결과만 반환한다.
+
+### CLI 및 패키지 실행 비용 최소화
+
+이미 설치된 CLI가 있다면 직접 실행한다.
+특별한 이유 없이 매 작업마다 `npx <package>@latest`처럼 패키지 탐색·버전 확인·임시 설치가 개입할 수 있는 실행 방식을 사용하지 않는다.
+
+### 검증 범위 단계화
+
+수정 후 검증은 수행하되 매 작은 수정마다 전체 프로젝트 빌드를 반복하지 않는다.
+가능하면 대상 파일·참조 확인 → 관련 컴파일 또는 좁은 검사 → 필요한 테스트 → 최종 전체 빌드·실행 순서로 검증 범위를 확대한다.
+작은 변경 여러 개를 하는 동안 동일한 전체 빌드를 반복하지 않는다.
+
+### 성능 이상 진단
+
+Desktop Commander 작업이 느릴 때 즉시 로컬 PC 성능 문제라고 판단하지 않는다.
+먼저 모델과 도구 사이의 직렬 왕복, Desktop Commander 전용 기능, 셸 프로세스 startup, PowerShell profile startup, 실제 CLI 실행, 파일 시스템 탐색, 대규모 출력 전송, 빌드·테스트 자체 실행 시간을 분리해 판단한다.
+
+짧은 작업에서 `start_process` 호출이 반복된다면 먼저 셸 선택과 프로세스 생성 횟수를 점검한다.
+
 ## 작업 원칙
 
 로컬 상태를 추측하지 않는다.
