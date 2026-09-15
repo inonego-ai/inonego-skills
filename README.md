@@ -11,4 +11,4 @@
 
 ## 문서
 
-- [Secure MCP Tunnel 로컬 MCP 전환 런북](docs/secure-mcp-tunnel-runbook.md)
+- [Secure MCP Tunnel 로컬 MCP 전환 운영 절차서](docs/secure-mcp-tunnel-runbook.md)

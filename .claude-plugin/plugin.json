@@ -10,6 +10,7 @@
     "./skills/programmer",
     "./skills/test-design",
     "./skills/dev-unity",
-    "./skills/target-state-implementation"
+    "./skills/target-state-implementation",
+    "./skills/chatgpt-share-reader"
   ]
 }
