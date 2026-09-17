@@ -1,9 +1,7 @@
 # C# 코딩 규칙 예시
 
-이 문서는 `csharp.md`의 규칙을 한 파일에 적용한 참고 예시다. 규칙 판단은 항상 `conventions/csharp.md`를 우선한다.
-
-아래 코드는 규칙 적용 예시다.
-구체적인 판단은 위의 `규칙 설명`을 따른다.
+이 문서는 `conventions/csharp.md`의 규칙을 한 파일에 적용한 참고 예시다.
+규칙 판단은 항상 원본 문서를 우선하고, 아래 코드는 전체 적용 형태를 보여주는 용도로만 사용한다.
 
 ```csharp
 /* BLOCK_HEADER_BEGIN =======================================================================
@@ -52,6 +50,11 @@ namespace inonego
 
     #region 내부 데이터
 
+        // ============================================================
+        /// <summary>
+        /// 좌표 데이터 예시.
+        /// </summary>
+        // ============================================================
         [Serializable]
         public struct Point
         {
@@ -59,8 +62,18 @@ namespace inonego
             public int Y;
         }
 
+        // ============================================================
+        /// <summary>
+        /// 상태 값 예시.
+        /// </summary>
+        // ============================================================
         public enum State { Idle, Running, Dead }
 
+        // ============================================================
+        /// <summary>
+        /// 부착 위치 값 예시.
+        /// </summary>
+        // ============================================================
         public enum AttachmentType
         {
             None = 0,
@@ -99,7 +112,14 @@ namespace inonego
                     // next에 대한 초기화 작업
                 }
 
-                OnValueChange?.Invoke(this, new ValueChangeEventArgs { Value = 0 });
+                OnValueChange?.Invoke
+                (
+                    this,
+                    new()
+                    {
+                        Value = 0,
+                    }
+                );
             }
         }
 
@@ -130,6 +150,11 @@ namespace inonego
 
     #region 이벤트
 
+        // ============================================================
+        /// <summary>
+        /// 값 변경 이벤트 인자 예시.
+        /// </summary>
+        // ============================================================
         [Serializable]
         public struct ValueChangeEventArgs
         {
@@ -152,7 +177,7 @@ namespace inonego
         /// 기본 생성자.
         /// </summary>
         // ------------------------------------------------------------
-        public Example() : base()
+        public Example()
         {
             // NONE
         }
@@ -162,7 +187,7 @@ namespace inonego
         /// 매개변수 생성자.
         /// </summary>
         // ------------------------------------------------------------
-        public Example(GameObject value) : this()
+        public Example(GameObject value)
         {
             if (this.value != null) return;
 
@@ -217,7 +242,6 @@ namespace inonego
         public void Despawn()
         {
             // 생성된 객체의 외부 공개 상태를 종료하고 정리한다.
-            // NONE
         }
 
     #endregion
@@ -226,8 +250,9 @@ namespace inonego
 
         // ----------------------------------------------------------------------
         /// <summary>
-        /// <br/> 복잡한 처리 흐름을 담은 메서드로, 람다식을 중첩 메서드로 추출하고
-        /// <br/> 매개변수가 많은 경우 여러 줄로 분리하여 작성하는 방식을 보여준다.
+        /// <br/> 복잡한 처리 흐름을 담은 메서드로, 이름이 유용한 조건은 지역 함수로 분리하고
+        /// <br/> 단순 호출은 한 줄로 두고, 의미 묶음이 있으면 그룹 단위로 나누며
+        /// <br/> 객체 초기화자 같은 복합 구조도 필요한 범위에서 여러 줄로 표현한다.
         /// </summary>
         // ----------------------------------------------------------------------
         public void ComplexMethodWithLongDescription()
@@ -245,7 +270,7 @@ namespace inonego
             var rotation = spawnPointObject.transform.rotation;
             var scale    = spawnPointObject.transform.localScale;
 
-            // 파라미터가 길어지는 호출은 괄호를 분리해 값 묶음을 명확히 보여준다.
+            // 개별 인수는 단순하지만 서로 다른 의미 묶음을 보여주기 위해 그룹 단위로 나눈다.
             LongParameterMethod
             (
                 position, rotation, scale,
@@ -255,7 +280,7 @@ namespace inonego
             // 상태 변경 알림은 이전/다음 상태를 한 객체로 묶어 구독자에게 전달한다.
             OnStateChanged?.Invoke
             (
-                this, new StateChangedEventArgs
+                this, new()
                 {
                     Previous = State.Idle,
                     Next     = State.Running,
