@@ -19,11 +19,20 @@ ENQUEUE_RE = re.compile(
 )
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 REDACTED_PLACEHOLDER = "The output of this plugin was redacted."
-DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; inonego-chatgpt-share-reader/1.0)"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; inonego-shared-chat-reader/2.0)"
+CODEX_SNAPSHOT_VERSION = 1
+CODEX_SNAPSHOT_URL = "https://chatgpt.com/backend-api/wham/shared_threads/{share_id}"
 
 
 class ShareReadError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class ShareSource:
+    kind: str
+    url: str
+    share_id: str
 
 
 @dataclass(frozen=True)
@@ -71,14 +80,24 @@ class FlatPayload:
         return None
 
 
-def parse_share_url(url: str) -> tuple[str, str]:
+def parse_share_url(url: str) -> ShareSource:
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme != "https" or parsed.hostname not in {"chatgpt.com", "www.chatgpt.com"}:
-        raise ShareReadError("`https://chatgpt.com/share/...` 형식의 URL이 필요합니다.")
-    match = re.fullmatch(r"/share/([^/]+)", parsed.path.rstrip("/"))
-    if not match:
-        raise ShareReadError("`https://chatgpt.com/share/<id>` 형식의 URL이 필요합니다.")
-    return url, match.group(1)
+        raise ShareReadError("ChatGPT 공유 URL이 필요합니다.")
+
+    path = parsed.path.rstrip("/")
+    web_match = re.fullmatch(r"/share/([^/]+)", path)
+    if web_match:
+        return ShareSource("chatgpt", url, web_match.group(1))
+
+    codex_match = re.fullmatch(r"/s/(cx_[^/]+)", path)
+    if codex_match:
+        return ShareSource("codex", url, codex_match.group(1))
+
+    raise ShareReadError(
+        "`https://chatgpt.com/share/<id>` 또는 "
+        "`https://chatgpt.com/s/cx_<id>` 형식의 URL이 필요합니다."
+    )
 
 
 def fetch_html(url: str, timeout: float, user_agent: str) -> str:
@@ -98,6 +117,40 @@ def fetch_html(url: str, timeout: float, user_agent: str) -> str:
             return response.read().decode("utf-8")
     except (urllib.error.URLError, TimeoutError) as exc:
         raise ShareReadError(f"요청에 실패했습니다: {exc}") from exc
+
+
+def fetch_json(url: str, timeout: float, user_agent: str) -> Any:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": user_agent,
+            "Accept": "application/json",
+            "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.7",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = getattr(response, "status", 200)
+            if status != 200:
+                raise ShareReadError(f"HTTP {status}")
+            body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 403:
+            reason = "접근이 거부되었습니다."
+        elif exc.code == 404:
+            reason = "공유 스냅샷을 찾지 못했습니다."
+        elif exc.code >= 500:
+            reason = "공유 서버 오류가 발생했습니다."
+        else:
+            reason = f"HTTP {exc.code}"
+        raise ShareReadError(reason) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise ShareReadError(f"요청에 실패했습니다: {exc}") from exc
+
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise ShareReadError("공유 스냅샷 JSON을 해석하지 못했습니다.") from exc
 
 
 def extract_payload(page_html: str) -> FlatPayload:
@@ -159,7 +212,7 @@ def extract_text(payload: FlatPayload, message_ref: int) -> str:
     return "\n".join(texts).strip()
 
 
-def iter_visible_turns(payload: FlatPayload, conversation_ref: int) -> Iterator[dict[str, Any]]:
+def iter_web_messages(payload: FlatPayload, conversation_ref: int) -> Iterator[dict[str, Any]]:
     linear_ref = payload.field_ref(conversation_ref, "linear_conversation")
     node_refs = payload.value(linear_ref)
     if not isinstance(node_refs, list):
@@ -234,24 +287,209 @@ def iter_visible_turns(payload: FlatPayload, conversation_ref: int) -> Iterator[
         yield last_progress
 
 
-def select_turns(
-    payload: FlatPayload,
-    conversation_ref: int,
+def extract_codex_user_text(content: Any) -> str:
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        content_type = part.get("type")
+        if content_type == "text":
+            text = part.get("text")
+            if isinstance(text, str) and text:
+                parts.append(text)
+        elif isinstance(content_type, str):
+            parts.append(f"[{content_type}]")
+        else:
+            parts.append("[첨부]")
+    return "\n".join(parts).strip()
+
+
+def extract_codex_activities(items: list[Any]) -> list[dict[str, Any]]:
+    activities: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict) or item.get("type") != "fileChange":
+            continue
+        paths: list[str] = []
+        for change in item.get("changes", []):
+            if not isinstance(change, dict):
+                continue
+            path = change.get("path")
+            if isinstance(path, str) and path and path not in paths:
+                paths.append(path)
+        activities.append(
+            {
+                "type": "file_change",
+                "status": item.get("status"),
+                "paths": paths,
+            }
+        )
+    return activities
+
+
+def iter_codex_messages(snapshot: Any) -> Iterator[dict[str, Any]]:
+    if not isinstance(snapshot, dict):
+        raise ShareReadError("Codex 공유 스냅샷 형식이 올바르지 않습니다.")
+    if snapshot.get("version") != CODEX_SNAPSHOT_VERSION:
+        raise ShareReadError(
+            f"지원하지 않는 Codex 공유 스냅샷 버전입니다: {snapshot.get('version')!r}"
+        )
+    snapshot_turns = snapshot.get("turns")
+    if not isinstance(snapshot_turns, list):
+        raise ShareReadError("Codex 공유 스냅샷에 `turns`가 없습니다.")
+
+    visible_index = 0
+    for snapshot_index, snapshot_turn in enumerate(snapshot_turns):
+        if not isinstance(snapshot_turn, dict):
+            raise ShareReadError("Codex 공유 turn 형식이 올바르지 않습니다.")
+        items = snapshot_turn.get("items")
+        if not isinstance(items, list):
+            raise ShareReadError("Codex 공유 turn에 `items`가 없습니다.")
+
+        messages: list[dict[str, Any]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_type = item.get("type")
+            if item_type == "userMessage":
+                text = extract_codex_user_text(item.get("content"))
+                if text:
+                    messages.append(
+                        {
+                            "role": "user",
+                            "kind": "user",
+                            "text": text,
+                            "snapshot_turn": snapshot_index,
+                        }
+                    )
+                continue
+
+            if item_type != "agentMessage" or item.get("phase") == "commentary":
+                continue
+            text = item.get("text")
+            if isinstance(text, str) and text.strip():
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "kind": "final",
+                        "text": text.strip(),
+                        "snapshot_turn": snapshot_index,
+                    }
+                )
+
+        activities = extract_codex_activities(items)
+        if activities and messages:
+            messages[-1]["activities"] = activities
+
+        for message in messages:
+            message["index"] = visible_index
+            visible_index += 1
+            yield message
+
+
+def select_messages(
+    iterator: Iterator[dict[str, Any]],
     selection: Selection,
 ) -> tuple[list[dict[str, Any]], bool]:
-    iterator = iter_visible_turns(payload, conversation_ref)
     if selection.mode == "all":
         return list(iterator), True
+
     count = selection.count or 0
     if selection.mode == "tail":
         return list(deque(iterator, maxlen=count)), True
 
-    turns: list[dict[str, Any]] = []
-    for turn in iterator:
-        turns.append(turn)
-        if len(turns) >= count:
-            return turns, False
-    return turns, True
+    messages: list[dict[str, Any]] = []
+    for message in iterator:
+        if len(messages) >= count:
+            return messages, False
+        messages.append(message)
+    return messages, True
+
+
+def build_result(
+    source: ShareSource,
+    selection: Selection,
+    messages: list[dict[str, Any]],
+    scan_complete: bool,
+    *,
+    title: str | None,
+    backing_conversation_id: Any = None,
+    snapshot_version: int | None = None,
+) -> dict[str, Any]:
+    source_data: dict[str, Any] = {
+        "kind": source.kind,
+        "url": source.url,
+        "share_id": source.share_id,
+        "backing_conversation_id": backing_conversation_id,
+        "title": title,
+    }
+    if snapshot_version is not None:
+        source_data["snapshot_version"] = snapshot_version
+
+    return {
+        "source": source_data,
+        "selection": {
+            "mode": selection.mode,
+            "requested": selection.count,
+            "returned": len(messages),
+            "scan_complete": scan_complete,
+        },
+        "messages": messages,
+    }
+
+
+def read_web_share(
+    source: ShareSource,
+    selection: Selection,
+    timeout: float,
+    user_agent: str,
+) -> dict[str, Any]:
+    page_html = fetch_html(source.url, timeout, user_agent)
+    payload = extract_payload(page_html)
+    conversation_ref = payload.find_object_ref("linear_conversation")
+    if conversation_ref is None:
+        raise ShareReadError("대화 객체를 찾지 못했습니다.")
+
+    title = payload.field_value(conversation_ref, "title") or fallback_html_title(page_html)
+    backing_id = payload.field_value(conversation_ref, "backing_conversation_id")
+    messages, scan_complete = select_messages(
+        iter_web_messages(payload, conversation_ref),
+        selection,
+    )
+    if not messages:
+        raise ShareReadError("화면에 표시되는 대화 메시지를 찾지 못했습니다.")
+    return build_result(
+        source,
+        selection,
+        messages,
+        scan_complete,
+        title=title,
+        backing_conversation_id=backing_id,
+    )
+
+
+def read_codex_share(
+    source: ShareSource,
+    selection: Selection,
+    timeout: float,
+    user_agent: str,
+) -> dict[str, Any]:
+    snapshot_url = CODEX_SNAPSHOT_URL.format(
+        share_id=urllib.parse.quote(source.share_id, safe="")
+    )
+    snapshot = fetch_json(snapshot_url, timeout, user_agent)
+    messages, scan_complete = select_messages(iter_codex_messages(snapshot), selection)
+    if not messages:
+        raise ShareReadError("화면에 표시되는 Codex 공유 메시지를 찾지 못했습니다.")
+    return build_result(
+        source,
+        selection,
+        messages,
+        scan_complete,
+        title="Shared Codex chat",
+        snapshot_version=CODEX_SNAPSHOT_VERSION,
+    )
 
 
 def read_share(
@@ -260,59 +498,56 @@ def read_share(
     timeout: float,
     user_agent: str,
 ) -> dict[str, Any]:
-    normalized_url, share_id = parse_share_url(url)
-    page_html = fetch_html(normalized_url, timeout, user_agent)
-    payload = extract_payload(page_html)
-    conversation_ref = payload.find_object_ref("linear_conversation")
-    if conversation_ref is None:
-        raise ShareReadError("대화 객체를 찾지 못했습니다.")
-
-    title = payload.field_value(conversation_ref, "title") or fallback_html_title(page_html)
-    backing_id = payload.field_value(conversation_ref, "backing_conversation_id")
-    turns, scan_complete = select_turns(payload, conversation_ref, selection)
-    if not turns:
-        raise ShareReadError("화면에 표시되는 대화 메시지를 찾지 못했습니다.")
-
-    return {
-        "source": {
-            "url": normalized_url,
-            "share_id": share_id,
-            "backing_conversation_id": backing_id,
-            "title": title,
-        },
-        "selection": {
-            "mode": selection.mode,
-            "requested": selection.count,
-            "returned": len(turns),
-            "scan_complete": scan_complete,
-        },
-        "turns": turns,
-    }
+    source = parse_share_url(url)
+    if source.kind == "chatgpt":
+        return read_web_share(source, selection, timeout, user_agent)
+    return read_codex_share(source, selection, timeout, user_agent)
 
 
 def render_text(result: dict[str, Any]) -> str:
     source = result["source"]
     lines = [
         f"# {source.get('title') or '(제목 없음)'}",
+        f"유형: {source.get('kind')}",
         f"공유 ID: {source.get('share_id')}",
-        f"원본 대화 ID: {source.get('backing_conversation_id') or '(확인되지 않음)'}",
-        "",
     ]
+    backing_id = source.get("backing_conversation_id")
+    if backing_id:
+        lines.append(f"원본 대화 ID: {backing_id}")
+    lines.append("")
+
     role_labels = {"user": "사용자", "assistant": "ChatGPT"}
-    for turn in result["turns"]:
-        suffix = " (진행 중)" if turn.get("kind") == "progress" else ""
-        role_label = role_labels.get(turn["role"], turn["role"])
-        lines.append(f"[{turn['index']}] {role_label}{suffix}")
-        lines.append(turn["text"])
+    for message in result["messages"]:
+        suffix = " (진행 중)" if message.get("kind") == "progress" else ""
+        role_label = role_labels.get(message["role"], message["role"])
+        lines.append(f"[{message['index']}] {role_label}{suffix}")
+        lines.append(message["text"])
+        for activity in message.get("activities", []):
+            if activity.get("type") != "file_change":
+                continue
+            paths = activity.get("paths") or []
+            status = activity.get("status") or "unknown"
+            if paths:
+                lines.append(
+                    f"[파일 변경: {status}] "
+                    + ", ".join(paths[:5])
+                    + (f" 외 {len(paths) - 5}개" if len(paths) > 5 else "")
+                )
+            else:
+                lines.append(f"[파일 변경: {status}]")
         lines.append("")
     return "\n".join(lines).rstrip()
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="ChatGPT 공유 링크에서 화면에 표시되는 대화 메시지를 읽습니다."
+        description="ChatGPT와 Codex 공유 링크에서 화면에 표시되는 대화 메시지를 읽습니다."
     )
-    parser.add_argument("urls", nargs="+", help="https://chatgpt.com/share/<id>")
+    parser.add_argument(
+        "urls",
+        nargs="+",
+        help="https://chatgpt.com/share/<id> 또는 https://chatgpt.com/s/cx_<id>",
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--head", type=int, metavar="N", help="앞부분의 화면 표시 메시지 N개를 읽습니다.")
     group.add_argument("--tail", type=int, metavar="N", help="마지막 화면 표시 메시지 N개를 읽습니다.")
@@ -362,6 +597,11 @@ def read_many(
 
 
 def main(argv: list[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+
     args = parse_args(argv or sys.argv[1:])
     try:
         selection = selection_from_args(args)
