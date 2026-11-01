@@ -3,7 +3,7 @@
 수정일 : 2026-09-17
 
 # 설명
-명백한 프로퍼티 대응 필드 인접 배치를 검사한다.
+타입 내부의 summary가 있는 멤버 경계와 프로퍼티 대응 필드 배치를 검사한다.
 ========================================================================= BLOCK_HEADER_END */
 
 using System;
@@ -31,29 +31,32 @@ namespace Inonego.Skills.CSharpTool
 
         // ------------------------------------------------------------
         /// <summary>
-        /// 각 타입의 프로퍼티-필드 쌍 인접 배치를 검사한다.
+        /// 멤버 소유 범위의 summary 경계와 프로퍼티-필드 쌍 배치를 검사한다.
         /// </summary>
         // ------------------------------------------------------------
         public static void Check(CSharpFileAnalysis analysis, List<ConventionDiagnostic> diagnostics)
         {
-            IEnumerable<DeclarationDescriptor> typeDeclarations = AnalysisTreeTraversal
-                .FlattenDeclarations(analysis.Declarations)
-                .Where(IsTypeDeclaration);
+            CheckSummarySpacing(analysis, analysis.Declarations, diagnostics);
 
-            foreach (DeclarationDescriptor type in typeDeclarations)
+            IEnumerable<DeclarationDescriptor> owners = AnalysisTreeTraversal
+                .FlattenDeclarations(analysis.Declarations)
+                .Where(IsMemberOwner);
+
+            foreach (DeclarationDescriptor owner in owners)
             {
-                CheckType(type, diagnostics);
+                CheckOwner(analysis, owner, diagnostics);
             }
         }
 
         // ------------------------------------------------------------
         /// <summary>
-        /// 타입 하나의 직접 하위 멤버 배치를 검사한다.
+        /// 같은 소유 범위의 직접 하위 멤버 배치를 검사한다.
         /// </summary>
         // ------------------------------------------------------------
-        private static void CheckType(DeclarationDescriptor type, List<ConventionDiagnostic> diagnostics)
+        private static void CheckOwner(CSharpFileAnalysis analysis, DeclarationDescriptor owner, List<ConventionDiagnostic> diagnostics)
         {
-            List<DeclarationDescriptor> members = type.Children.OrderBy(member => member.StartPosition).ToList();
+            List<DeclarationDescriptor> members = owner.Children.OrderBy(member => member.StartPosition).ToList();
+            CheckSummarySpacing(analysis, members, diagnostics);
 
             // 직접 대응 후보를 먼저 모은 뒤 하나의 필드를 여러 프로퍼티가 공유하는 모호한 관계는 자동 pair에서 제외한다.
             Dictionary<DeclarationDescriptor, DeclarationDescriptor> pairByProperty = new();
@@ -96,6 +99,63 @@ namespace Inonego.Skills.CSharpTool
                 }
             }
 
+        }
+
+        // ----------------------------------------------------------------------
+        /// <summary>
+        /// XML summary가 있는 다음 멤버의 주석 블록 앞에 빈 줄 하나를 요구한다.
+        /// </summary>
+        // ----------------------------------------------------------------------
+        private static void CheckSummarySpacing
+        (
+            CSharpFileAnalysis analysis,
+            IReadOnlyList<DeclarationDescriptor> members,
+            List<ConventionDiagnostic> diagnostics
+        )
+        {
+            for (int index = 1; index < members.Count; index++)
+            {
+                DeclarationDescriptor previous = members[index - 1];
+                DeclarationDescriptor next = members[index];
+                SummaryDescriptor? summary = next.Summary;
+                if (summary == null || !summary.Exists || !summary.TopSeparatorAdjacent
+                    || !ReferenceEquals(previous.Region, next.Region))
+                {
+                    continue;
+                }
+
+                int endLine = analysis.SourceText.Lines.GetLineFromPosition(previous.EndPosition - 1).LineNumber;
+                int separatorLine = summary.Range.StartLine - 2;
+                if (separatorLine <= endLine)
+                {
+                    continue;
+                }
+
+                bool hasOtherContent = false;
+                for (int line = endLine + 1; line < separatorLine; line++)
+                {
+                    if (!string.IsNullOrWhiteSpace(analysis.SourceText.Lines[line].ToString()))
+                    {
+                        hasOtherContent = true;
+                        break;
+                    }
+                }
+
+                if (hasOtherContent || separatorLine - endLine == 2)
+                {
+                    continue;
+                }
+
+                diagnostics.Add
+                (
+                    ConventionDiagnostic.Create
+                    (
+                        RuleID.MemberSummarySpacing, SourceRange.FromLine(separatorLine + 1),
+                        "이전 멤버와 다음 멤버의 XML summary 구분선 사이에는 빈 줄을 정확히 하나 둬야 합니다.",
+                        next.Name
+                    )
+                );
+            }
         }
 
     #endregion
@@ -225,9 +285,10 @@ namespace Inonego.Skills.CSharpTool
         /// 멤버 배치 검사를 수행할 타입 선언인지 확인한다.
         /// </summary>
         // ------------------------------------------------------------
-        private static bool IsTypeDeclaration(DeclarationDescriptor declaration)
+        private static bool IsMemberOwner(DeclarationDescriptor declaration)
         {
-            return declaration.Kind is "class" or "struct" or "record" or "record struct";
+            return declaration.Kind is "namespace" or "class" or "struct" or "interface"
+                or "record" or "record struct" or "enum";
         }
 
         // ------------------------------------------------------------

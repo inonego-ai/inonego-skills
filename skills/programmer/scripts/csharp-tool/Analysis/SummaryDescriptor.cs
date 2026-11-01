@@ -22,6 +22,8 @@ namespace Inonego.Skills.CSharpTool
     {
         public bool Exists                        = false;
         public bool HasInlineTagContent           = false;
+        public int SummaryBlockCount              = 0;
+        public bool HasIncompleteSummary          = false;
         public List<string> RawDescriptionLines   = new();
         public List<string> DescriptionLines      = new();
         public List<bool> DescriptionLineHasBreak = new();

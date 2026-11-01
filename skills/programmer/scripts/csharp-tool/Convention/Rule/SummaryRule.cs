@@ -45,8 +45,31 @@ namespace Inonego.Skills.CSharpTool
         {
             SummaryDescriptor? summary = declaration.Summary;
 
-            // summary 자체는 선택 사항이며, 존재하는 경우에만 형식과 내용을 검사한다.
-            if (summary == null || !summary.Exists)
+            // summary 존재는 선택 사항이지만 중복·불완전 블록은 완결 여부와 무관하게 진단한다.
+            if (summary == null)
+            {
+                return;
+            }
+
+            if (summary.SummaryBlockCount > 1)
+            {
+                Add
+                (
+                    diagnostics, RuleID.SummaryDuplicate, summary.Range, declaration.Name,
+                    "한 선언에 XML summary 블록을 여러 개 연결할 수 없습니다.", string.Empty
+                );
+            }
+
+            if (summary.HasIncompleteSummary)
+            {
+                Add
+                (
+                    diagnostics, RuleID.SummaryIncomplete, summary.Range, declaration.Name,
+                    "열린 XML summary 블록은 반드시 닫아야 합니다.", string.Empty
+                );
+            }
+
+            if (!summary.Exists)
             {
                 return;
             }

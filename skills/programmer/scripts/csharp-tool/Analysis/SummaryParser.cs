@@ -73,6 +73,8 @@ namespace Inonego.Skills.CSharpTool
             // 선언 직전 trivia에서 마지막으로 완결된 summary 쌍을 선택해 더 먼 주석과 잘못 연결하지 않는다.
             int open = -1;
             int close = -1;
+            int summaryCount = 0;
+            bool hasIncompleteSummary = false;
             string openingContent = string.Empty;
             string closingContent = string.Empty;
             bool hasInlineTagContent = false;
@@ -81,6 +83,8 @@ namespace Inonego.Skills.CSharpTool
                 string line = lines[index].Line.TrimStart();
                 if (line.StartsWith("/// <summary>", StringComparison.Ordinal))
                 {
+                    hasIncompleteSummary |= open >= 0 && close < open;
+                    summaryCount++;
                     open = index;
                     close = -1;
                     openingContent = line["/// <summary>".Length..].Trim();
@@ -113,15 +117,26 @@ namespace Inonego.Skills.CSharpTool
                 hasInlineTagContent |= !string.Equals(line, "/// </summary>", StringComparison.Ordinal);
             }
 
-            if (open < 0 || close < open)
+            if (open < 0)
             {
                 return null;
             }
 
+            hasIncompleteSummary |= close < open;
+
             // Inspector는 태그를 제거한 설명을 쓰고 Checker는 원문 폭과 `<br/>` 형식을 보므로 두 표현을 함께 보존한다.
             SummaryDescriptor summary = new();
-            summary.Exists = true;
+            summary.Exists = close >= open;
+            summary.SummaryBlockCount = summaryCount;
+            summary.HasIncompleteSummary = hasIncompleteSummary;
             summary.HasInlineTagContent = hasInlineTagContent;
+            if (!summary.Exists)
+            {
+                int line = sourceText.Lines.GetLineFromPosition(node.FullSpan.Start + lines[open].Offset).LineNumber + 1;
+                summary.Range = SourceRange.FromLine(line);
+                return summary;
+            }
+
             AddDescriptionLine(summary, openingContent);
             for (int index = open + 1; index < close; index++)
             {

@@ -41,6 +41,8 @@ namespace Inonego.Skills.CSharpTool
         internal const string SummaryEmpty               = "CSHARP-SUMMARY-007";
         internal const string SummarySeparatorSpacing    = "CSHARP-SUMMARY-008";
         internal const string SummaryBlockLayout         = "CSHARP-SUMMARY-009";
+        internal const string SummaryDuplicate           = "CSHARP-SUMMARY-010";
+        internal const string SummaryIncomplete          = "CSHARP-SUMMARY-011";
         internal const string RegionTypeSpacing          = "CSHARP-REGION-001";
         internal const string RegionAfterStartSpacing    = "CSHARP-REGION-002";
         internal const string RegionBeforeEndSpacing     = "CSHARP-REGION-003";
@@ -51,6 +53,7 @@ namespace Inonego.Skills.CSharpTool
         internal const string RegionEmptyName            = "CSHARP-REGION-008";
         internal const string MemberPairAdjacency        = "CSHARP-MEMBER-001";
         internal const string MemberBackingBelow         = "CSHARP-MEMBER-002";
+        internal const string MemberSummarySpacing       = "CSHARP-MEMBER-003";
         internal const string NamePascal                 = "CSHARP-NAME-001";
         internal const string NameInterface              = "CSHARP-NAME-002";
         internal const string NameCamel                  = "CSHARP-NAME-003";
