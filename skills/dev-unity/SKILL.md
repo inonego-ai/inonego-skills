@@ -20,4 +20,4 @@ Unity 고유 실행 환경과 자산 연결을 다룰 때 사용한다. 코드 �
 ## 특수 작업 절차
 
 - 기존 셰이더나 절차적 렌더링 구현을 Unity로 옮길 때는 [셰이더 원본 이식](references/shader-porting.md)을 적용한다.
-- Unity 테스트 변경이 승인된 경우에만 `test-design`과 [Unity 테스트 배치와 작성 규칙](references/testing.md)을 적용한다.
+- Unity 테스트 변경이 승인된 경우에만 [Unity 테스트 배치와 작성 규칙](references/testing.md)을 적용한다.

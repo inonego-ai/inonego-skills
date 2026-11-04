@@ -1,6 +1,6 @@
 {
   "name": "inonego-skills",
-  "description": "inonego의 작업 계획, 프로그래밍, 테스트 설계, Unity 개발 스킬 모음입니다.",
+  "description": "inonego의 작업 계획, 프로그래밍, 정렬, Unity 개발 스킬 모음입니다.",
   "version": "1.1.1",
   "author": {
     "name": "inonego"
@@ -8,9 +8,8 @@
   "skills": [
     "./skills/planning",
     "./skills/programmer",
-    "./skills/test-design",
+    "./skills/align",
     "./skills/dev-unity",
-    "./skills/target-state-implementation",
     "./skills/chatgpt-share-reader"
   ]
 }
