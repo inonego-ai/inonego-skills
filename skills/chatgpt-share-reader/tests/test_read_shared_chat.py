@@ -1,7 +1,10 @@
 import importlib.util
+import io
 import pathlib
 import sys
 import unittest
+import urllib.error
+from unittest import mock
 
 
 SCRIPT_PATH = pathlib.Path(__file__).parents[1] / "scripts" / "read_shared_chat.py"
@@ -23,6 +26,96 @@ class SharedChatReaderTests(unittest.TestCase):
     def test_parse_share_url_rejects_unknown_shape(self) -> None:
         with self.assertRaises(reader.ShareReadError):
             reader.parse_share_url("https://chatgpt.com/s/example")
+
+    def test_html_retries_transient_503_with_browser_user_agent(self) -> None:
+        url = "https://chatgpt.com/share/example"
+        error = urllib.error.HTTPError(url, 503, "Service Unavailable", {}, io.BytesIO())
+        with (
+            mock.patch.object(
+                reader.urllib.request,
+                "urlopen",
+                side_effect=[error, io.BytesIO(b"shared html")],
+            ) as open_url,
+            mock.patch.object(reader.time, "sleep") as sleep,
+        ):
+            text = reader.fetch_html(url, 5.0, reader.DEFAULT_USER_AGENT)
+
+        self.assertEqual("shared html", text)
+        self.assertEqual(2, open_url.call_count)
+        self.assertIn("Chrome/", open_url.call_args.args[0].get_header("User-agent"))
+        sleep.assert_called_once_with(1.0)
+
+    def test_json_retries_transient_errors(self) -> None:
+        url = "https://chatgpt.com/backend-api/wham/shared_threads/cx_example"
+        errors = [
+            urllib.error.HTTPError(url, code, "Temporary error", {}, io.BytesIO())
+            for code in (429, 503)
+        ]
+        with (
+            mock.patch.object(
+                reader.urllib.request,
+                "urlopen",
+                side_effect=[*errors, io.BytesIO(b'{"version": 1}')],
+            ) as open_url,
+            mock.patch.object(reader.time, "sleep") as sleep,
+        ):
+            snapshot = reader.fetch_json(url, 5.0, reader.DEFAULT_USER_AGENT)
+
+        self.assertEqual({"version": 1}, snapshot)
+        self.assertEqual(3, open_url.call_count)
+        self.assertEqual([mock.call(1.0), mock.call(2.0)], sleep.call_args_list)
+
+    def test_connection_timeout_is_retried(self) -> None:
+        url = "https://chatgpt.com/share/example"
+        with (
+            mock.patch.object(
+                reader.urllib.request,
+                "urlopen",
+                side_effect=[urllib.error.URLError(TimeoutError("timed out")), io.BytesIO(b"ok")],
+            ) as open_url,
+            mock.patch.object(reader.time, "sleep") as sleep,
+        ):
+            self.assertEqual("ok", reader.fetch_html(url, 5.0, reader.DEFAULT_USER_AGENT))
+
+        self.assertEqual(2, open_url.call_count)
+        sleep.assert_called_once_with(1.0)
+
+    def test_nontransient_http_error_is_not_retried(self) -> None:
+        url = "https://chatgpt.com/share/missing"
+        error = urllib.error.HTTPError(url, 404, "Not Found", {}, io.BytesIO())
+        with (
+            mock.patch.object(reader.urllib.request, "urlopen", side_effect=error) as open_url,
+            mock.patch.object(reader.time, "sleep") as sleep,
+            self.assertRaisesRegex(reader.ShareReadError, "HTTP Error 404"),
+        ):
+            reader.fetch_html(url, 5.0, reader.DEFAULT_USER_AGENT)
+
+        open_url.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_transient_error_stops_after_bounded_retries(self) -> None:
+        url = "https://chatgpt.com/share/unavailable"
+        errors = [
+            urllib.error.HTTPError(url, 503, "Service Unavailable", {}, io.BytesIO())
+            for _ in range(3)
+        ]
+        with (
+            mock.patch.object(reader.urllib.request, "urlopen", side_effect=errors) as open_url,
+            mock.patch.object(reader.time, "sleep") as sleep,
+            self.assertRaisesRegex(reader.ShareReadError, "HTTP Error 503"),
+        ):
+            reader.fetch_html(url, 5.0, reader.DEFAULT_USER_AGENT)
+
+        self.assertEqual(3, open_url.call_count)
+        self.assertEqual(2, sleep.call_count)
+
+    def test_user_agent_can_be_overridden_in_cli(self) -> None:
+        args = reader.parse_args([
+            "https://chatgpt.com/share/example",
+            "--user-agent",
+            "Custom Reader",
+        ])
+        self.assertEqual("Custom Reader", args.user_agent)
 
     def test_codex_filters_hidden_items_and_keeps_final(self) -> None:
         snapshot = {

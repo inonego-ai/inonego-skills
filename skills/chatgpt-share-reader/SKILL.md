@@ -26,6 +26,15 @@ https://chatgpt.com/backend-api/wham/shared_threads/<cx_share_id>
 ```
 
 Codex snapshot은 현재 `version: 1`만 지원한다. 다른 버전은 추측해서 해석하지 않고 오류로 처리한다.
+
+## HTTP 접근과 장애 대응
+
+- 스크립트는 공개 공유 URL에 표준 HTTP 요청을 사용한다. 로그인 쿠키, 브라우저 자동화, Cloudflare 챌린지 해결은 사용하지 않는다.
+- 과거 전용 봇 User-Agent로 공유 페이지에서 반복적인 HTTP 503이 발생했다. 현재 기본값은 실제 접근을 확인한 일반 Chrome 호환 User-Agent이다.
+- 일시적인 HTTP `429`, `500`, `502`, `503`, `504` 및 네트워크 타임아웃은 최대 2회 추가 재시도한다(1초, 2초 간격). `403`, `404`나 지원하지 않는 공유 데이터 형식은 재시도하지 않는다.
+- 서버 응답 정책이 다시 바뀌면 `--user-agent`로 요청 헤더를 명시적으로 지정할 수 있다. 무작위 User-Agent 순환이나 접근 통제 우회는 하지 않는다.
+- 재시도 후에도 실패하면 성공으로 간주하지 않고 HTTP 상태 및 파싱 오류를 보고한다. 브라우저에서 열리는 것과 자동 판독에 성공하는 것은 별개다.
+
 ## 공통 본문 판정 계약
 
 최종 출력의 message count에는 사용자와 화면 표시 assistant 메시지만 포함한다.
@@ -52,7 +61,7 @@ Codex 공유:
 
 1. URL 형식과 source 종류를 확인한다.
 2. `scripts/read_shared_chat.py`를 사용한다.
-3. 사용자가 전체 판독을 명시하지 않았다면 앞부분 message 8개만 읽는다.
+3. 일반적인 미리보기에는 앞부분 visible message 8개를 읽는다. 공유 대화 내용을 읽고 맥락을 숙지하거나 후속 작업에 인계하라는 요청에는 `--all`로 전체를 읽는다.
 4. source, 공유 ID, 제목·원본 대화 ID가 제공되는 형식이면 함께 확인한다.
 5. 필요한 범위만 요약하거나 후속 작업의 컨텍스트로 사용한다.
 6. parser가 지원하지 않는 snapshot version이나 구조를 만나면 브라우저 fallback으로 추측하지 않고 실패를 명확히 보고한다.
@@ -71,6 +80,8 @@ python scripts/read_shared_chat.py <share-url> --head 8
 python scripts/read_shared_chat.py <share-url> --tail 8
 python scripts/read_shared_chat.py <share-url> --all
 python scripts/read_shared_chat.py <url1> <url2> --head 6 --jobs 4
+# 기본 접근에 계속 문제가 있을 때에만 헤더를 명시
+python scripts/read_shared_chat.py <share-url> --head 8 --user-agent "<User-Agent 문자열>"
 ```
 
 `--head`와 `--tail`의 N은 내부 activity·reasoning 개수가 아니라 정규화된 visible message 개수다.

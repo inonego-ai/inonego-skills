@@ -6,6 +6,7 @@ import html
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -19,7 +20,12 @@ ENQUEUE_RE = re.compile(
 )
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 REDACTED_PLACEHOLDER = "The output of this plugin was redacted."
-DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; inonego-shared-chat-reader/2.0)"
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+RETRYABLE_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504})
+RETRY_DELAYS = (1.0, 2.0)
 CODEX_SNAPSHOT_VERSION = 1
 CODEX_SNAPSHOT_URL = "https://chatgpt.com/backend-api/wham/shared_threads/{share_id}"
 
@@ -100,6 +106,31 @@ def parse_share_url(url: str) -> ShareSource:
     )
 
 
+def read_response_bytes(request: urllib.request.Request, timeout: float) -> bytes:
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                status = getattr(response, "status", 200)
+                if status != 200:
+                    raise ShareReadError(f"HTTP {status}")
+                return response.read()
+        except urllib.error.HTTPError as exc:
+            if exc.code not in RETRYABLE_HTTP_STATUSES or attempt == len(RETRY_DELAYS):
+                raise
+            exc.close()
+            time.sleep(RETRY_DELAYS[attempt])
+        except urllib.error.URLError as exc:
+            if not isinstance(exc.reason, TimeoutError) or attempt == len(RETRY_DELAYS):
+                raise
+            time.sleep(RETRY_DELAYS[attempt])
+        except TimeoutError:
+            if attempt == len(RETRY_DELAYS):
+                raise
+            time.sleep(RETRY_DELAYS[attempt])
+
+    raise AssertionError("HTTP 재시도 횟수를 초과했습니다.")
+
+
 def fetch_html(url: str, timeout: float, user_agent: str) -> str:
     request = urllib.request.Request(
         url,
@@ -110,11 +141,7 @@ def fetch_html(url: str, timeout: float, user_agent: str) -> str:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            status = getattr(response, "status", 200)
-            if status != 200:
-                raise ShareReadError(f"HTTP {status}")
-            return response.read().decode("utf-8")
+        return read_response_bytes(request, timeout).decode("utf-8")
     except (urllib.error.URLError, TimeoutError) as exc:
         raise ShareReadError(f"요청에 실패했습니다: {exc}") from exc
 
@@ -129,18 +156,14 @@ def fetch_json(url: str, timeout: float, user_agent: str) -> Any:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            status = getattr(response, "status", 200)
-            if status != 200:
-                raise ShareReadError(f"HTTP {status}")
-            body = response.read().decode("utf-8")
+        body = read_response_bytes(request, timeout).decode("utf-8")
     except urllib.error.HTTPError as exc:
         if exc.code == 403:
             reason = "접근이 거부되었습니다."
         elif exc.code == 404:
             reason = "공유 스냅샷을 찾지 못했습니다."
         elif exc.code >= 500:
-            reason = "공유 서버 오류가 발생했습니다."
+            reason = f"공유 서버 오류가 발생했습니다 (HTTP {exc.code})."
         else:
             reason = f"HTTP {exc.code}"
         raise ShareReadError(reason) from exc
@@ -554,6 +577,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     group.add_argument("--all", action="store_true", help="화면에 표시되는 대화 메시지를 모두 읽습니다.")
     parser.add_argument("--jobs", type=int, default=4, help="동시에 가져올 URL 수입니다. 최대 8개까지 사용합니다.")
     parser.add_argument("--timeout", type=float, default=20.0, help="HTTP 요청 제한 시간(초)입니다.")
+    parser.add_argument("--user-agent", default=DEFAULT_USER_AGENT, help="공유 서버에 보낼 HTTP User-Agent입니다.")
     parser.add_argument("--format", choices=("json", "text"), default="json", help="출력 형식입니다.")
     return parser.parse_args(argv)
 
@@ -610,7 +634,7 @@ def main(argv: list[str] | None = None) -> int:
             selection,
             args.jobs,
             args.timeout,
-            DEFAULT_USER_AGENT,
+            args.user_agent,
         )
     except ShareReadError as exc:
         print(f"오류: {exc}", file=sys.stderr)
