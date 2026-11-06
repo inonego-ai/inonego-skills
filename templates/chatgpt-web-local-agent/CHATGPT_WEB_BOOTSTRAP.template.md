@@ -34,6 +34,13 @@ ChatGPT Web의 연결된 로컬 도구는 호출당 고정 지연이 클 수 있
 - 배치가 과도한 출력, context 낭비, 실패 격리 저하 또는 디버깅 난이도 증가를 만들면 적절한 단위로 분리한다.
 - 성능 최적화보다 작업의 정확성, 사용자 요청 범위, 안전한 side effect 경계를 우선한다.
 
+## 데스크톱 GUI 자동화
+
+- ChatGPT 웹에서 Windows GUI 관찰·조작이 필요하면 연결된 로컬 도구로 `agent-desktop` CLI를 사용한다. 파일·Git·빌드 등은 기존 로컬 도구를 사용한다.
+- 사용 전 `agent-desktop status`로 상태를 확인한다. 상세 사용법은 `agent-desktop skills get desktop`과 `agent-desktop skills get platform`을 필요할 때 읽는다.
+- 접근성 `snapshot`으로 요소 확인 → 참조 기반 조작 → 결과 재확인 순서를 따른다. 기본은 headless이며 민감한 화면·클립보드 내용을 로그에 남기지 않는다.
+- AI 커서 오버레이를 켤 때는 `agent-desktop cursor-overlay enable --size 0.7`을 사용한다. `session start --cursor`만으로 활성화했다면 같은 세션에서 `cursor-overlay enable --size 0.7`을 다시 적용한다.
+
 ## 전역 지침
 
 다음 전역 지침 파일이 존재하면 읽는다.
