@@ -1,9 +1,9 @@
 /* BLOCK_HEADER_BEGIN =======================================================================
 파일명 : SummaryRule.cs
-수정일 : 2026-09-17
+수정일 : 2026-11-11
 
 # 설명
-존재하는 XML summary의 구분선, 설명 폭과 br 형식 규칙을 검사한다.
+public 선언의 필수 XML summary, XML 문서 주석 전체의 경계, 설명 폭 및 br 형식을 검사한다.
 ========================================================================= BLOCK_HEADER_END */
 
 using System;
@@ -45,9 +45,18 @@ namespace Inonego.Skills.CSharpTool
         {
             SummaryDescriptor? summary = declaration.Summary;
 
-            // summary 존재는 선택 사항이지만 중복·불완전 블록은 완결 여부와 무관하게 진단한다.
+            // 부모 타입의 접근 수준과 무관하게 public 선언에는 summary가 필요하며 enum 개별 값은 제외한다.
             if (summary == null)
             {
+                if (declaration.Accessibility == "public" && declaration.Kind != "enum member")
+                {
+                    Add
+                    (
+                        diagnostics, RuleID.SummaryMissing, declaration.Range, declaration.Name,
+                        "public 선언에는 XML summary가 필요합니다.", "구분선으로 둘러싼 XML summary 블록"
+                    );
+                }
+
                 return;
             }
 
@@ -95,6 +104,7 @@ namespace Inonego.Skills.CSharpTool
 
             char expectedMarker = IsTypeLike(declaration.Kind) ? '=' : '-';
             CheckSeparators(declaration.Name, summary, expectedMarker, diagnostics);
+            CheckDocumentationBoundary(declaration.Name, summary, diagnostics);
             CheckDescriptionWidth(declaration.Name, summary, expectedMarker, diagnostics);
             CheckBreakUsage(declaration.Name, summary, diagnostics);
         }
@@ -110,7 +120,7 @@ namespace Inonego.Skills.CSharpTool
                 || summary.BottomSeparator.Length > 0 && !summary.BottomSeparatorAdjacent;
             if (hasDetachedSeparator)
             {
-                Add(diagnostics, RuleID.SummarySeparatorSpacing, summary.Range, declarationName, "summary 구분선은 `<summary>` 바로 위와 `</summary>` 바로 아래에 둬야 합니다.", string.Empty);
+                Add(diagnostics, RuleID.SummarySeparatorSpacing, summary.Range, declarationName, "상단 구분선은 `<summary>` 바로 위에, 하단 구분선은 마지막 XML 문서 주석 바로 아래에 둬야 합니다.", string.Empty);
             }
 
             bool hasWrongMarker = !HasSeparatorMarker(summary.TopSeparator, expectedMarker)
@@ -125,6 +135,26 @@ namespace Inonego.Skills.CSharpTool
             {
                 Add(diagnostics, RuleID.SummarySeparatorMismatch, summary.Range, declarationName, "summary 위아래 구분선은 같은 원문이어야 합니다.", string.Empty);
             }
+        }
+
+        // ------------------------------------------------------------
+        /// <summary>
+        /// 작성된 XML 문서 주석이 하단 구분선 뒤로 벗어났는지 검사한다.
+        /// </summary>
+        // ------------------------------------------------------------
+        private static void CheckDocumentationBoundary(string declarationName, SummaryDescriptor summary, List<ConventionDiagnostic> diagnostics)
+        {
+            if (summary.DocumentationOutsideSeparator is not SourceRange location)
+            {
+                return;
+            }
+
+            Add
+            (
+                diagnostics, RuleID.SummaryDocumentationBoundary, location, declarationName,
+                "XML 문서 주석은 모두 하나의 상단·하단 구분선 안에 작성해야 합니다.",
+                "`<param>`, `<typeparam>`, `<returns>` 등은 하단 구분선 위로 이동"
+            );
         }
 
         // ------------------------------------------------------------

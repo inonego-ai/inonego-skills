@@ -1,9 +1,9 @@
 /* BLOCK_HEADER_BEGIN =======================================================================
 파일명 : RuleID.cs
-수정일 : 2026-09-17
+수정일 : 2026-11-11
 
 # 설명
-외부 출력에 안정적으로 노출할 C# 컨벤션 규칙 ID를 정의한다.
+외부 출력용 C# 컨벤션 규칙 ID를 진단 책임별 순서로 정의한다.
 ========================================================================= BLOCK_HEADER_END */
 
 namespace Inonego.Skills.CSharpTool
@@ -32,17 +32,19 @@ namespace Inonego.Skills.CSharpTool
         internal const string FormatEmptyScopeNone       = "CSHARP-FORMAT-004";
         internal const string FormatEmptyScopeCompact    = "CSHARP-FORMAT-005";
         internal const string FormatBlockSpacing         = "CSHARP-FORMAT-006";
-        internal const string SummarySeparatorType       = "CSHARP-SUMMARY-001";
-        internal const string SummarySeparatorLength     = "CSHARP-SUMMARY-002";
-        internal const string SummarySeparatorMismatch   = "CSHARP-SUMMARY-003";
-        internal const string SummarySingleBreak         = "CSHARP-SUMMARY-004";
-        internal const string SummaryMultiBreak          = "CSHARP-SUMMARY-005";
-        internal const string SummaryWidth               = "CSHARP-SUMMARY-006";
-        internal const string SummaryEmpty               = "CSHARP-SUMMARY-007";
-        internal const string SummarySeparatorSpacing    = "CSHARP-SUMMARY-008";
-        internal const string SummaryBlockLayout         = "CSHARP-SUMMARY-009";
-        internal const string SummaryDuplicate           = "CSHARP-SUMMARY-010";
-        internal const string SummaryIncomplete          = "CSHARP-SUMMARY-011";
+        internal const string SummaryMissing             = "CSHARP-SUMMARY-001";
+        internal const string SummaryDuplicate           = "CSHARP-SUMMARY-002";
+        internal const string SummaryIncomplete          = "CSHARP-SUMMARY-003";
+        internal const string SummaryBlockLayout         = "CSHARP-SUMMARY-004";
+        internal const string SummaryEmpty               = "CSHARP-SUMMARY-005";
+        internal const string SummarySeparatorType       = "CSHARP-SUMMARY-006";
+        internal const string SummarySeparatorLength     = "CSHARP-SUMMARY-007";
+        internal const string SummarySeparatorMismatch   = "CSHARP-SUMMARY-008";
+        internal const string SummarySeparatorSpacing    = "CSHARP-SUMMARY-009";
+        internal const string SummaryDocumentationBoundary = "CSHARP-SUMMARY-010";
+        internal const string SummaryWidth               = "CSHARP-SUMMARY-011";
+        internal const string SummarySingleBreak         = "CSHARP-SUMMARY-012";
+        internal const string SummaryMultiBreak          = "CSHARP-SUMMARY-013";
         internal const string RegionTypeSpacing          = "CSHARP-REGION-001";
         internal const string RegionAfterStartSpacing    = "CSHARP-REGION-002";
         internal const string RegionBeforeEndSpacing     = "CSHARP-REGION-003";

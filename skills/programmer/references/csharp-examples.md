@@ -41,6 +41,8 @@ namespace inonego
     /// <summary>
     /// 클래스 설명
     /// </summary>
+    /// <typeparam name="TKey">항목 식별자 형식.</typeparam>
+    /// <typeparam name="T">항목 값 형식.</typeparam>
     // ============================================================
     [Serializable]
     public abstract class Example<TKey, T>
@@ -186,6 +188,7 @@ namespace inonego
         /// <summary>
         /// 매개변수 생성자.
         /// </summary>
+        /// <param name="value">초기 게임 오브젝트.</param>
         // ------------------------------------------------------------
         public Example(GameObject value)
         {

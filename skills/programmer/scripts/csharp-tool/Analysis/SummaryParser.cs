@@ -1,9 +1,9 @@
 /* BLOCK_HEADER_BEGIN =======================================================================
 파일명 : SummaryParser.cs
-수정일 : 2026-09-17
+수정일 : 2026-11-11
 
 # 설명
-선언 앞 XML summary와 구분선 정보를 추출한다.
+선언 앞 XML summary와 나머지 XML 문서 주석의 구분선 경계 및 형식 정보를 추출한다.
 ========================================================================= BLOCK_HEADER_END */
 
 using System;
@@ -147,9 +147,19 @@ namespace Inonego.Skills.CSharpTool
 
             // 구분선 원문과 바로 붙어 있는지 여부를 따로 저장해 출력 정규화와 형식 판정을 섞지 않는다.
             summary.TopSeparator = FindSeparator(lines, open - 1, -1);
-            summary.BottomSeparator = FindSeparator(lines, close + 1, 1);
+            summary.BottomSeparator = FindBottomSeparator(lines, close + 1, out bool bottomAdjacent);
             summary.TopSeparatorAdjacent = open > 0 && IsSeparator(lines[open - 1].Line.Trim());
-            summary.BottomSeparatorAdjacent = close + 1 < lines.Count && IsSeparator(lines[close + 1].Line.Trim());
+            summary.BottomSeparatorAdjacent = bottomAdjacent;
+
+            // 하단 구분선 뒤에 XML 문서 주석이 다시 나오면 첫 구분선을 유효한 종료로 인정하지 않는다.
+            int outsideIndex = FindDocumentationOutsideSeparator(lines, open, close);
+            if (outsideIndex >= 0)
+            {
+                int position = node.FullSpan.Start + lines[outsideIndex].Offset;
+                int line = sourceText.Lines.GetLineFromPosition(Math.Min(position, sourceText.Length)).LineNumber + 1;
+                summary.DocumentationOutsideSeparator = SourceRange.FromLine(line);
+            }
+
             int triviaStart = node.FullSpan.Start;
             int startPosition = triviaStart + lines[open].Offset;
             int endPosition = triviaStart + lines[close].Offset + lines[close].Line.Length;
@@ -197,7 +207,111 @@ namespace Inonego.Skills.CSharpTool
 
         // ------------------------------------------------------------
         /// <summary>
-        /// summary 주변에서 가장 가까운 구분선 주석을 찾는다.
+        /// <br/> summary에 연결된 XML 문서 주석이 구분선 밖으로 나가거나
+        /// <br/> 문서화 영역 안에서 끊긴 첫 줄의 위치를 찾는다.
+        /// </summary>
+        // ------------------------------------------------------------
+        private static int FindDocumentationOutsideSeparator
+        (
+            IReadOnlyList<(string Line, int Offset)> lines,
+            int open,
+            int close
+        )
+        {
+            // summary 앞의 상단 구분선보다 먼저 XML 문서 주석을 쓰면 그 주석이 블록 밖에 남는다.
+            if (open > 0 && IsSeparator(lines[open - 1].Line.Trim()))
+            {
+                for (int index = open - 2; index >= 0; index--)
+                {
+                    string line = lines[index].Line.Trim();
+                    if (line.StartsWith("///", StringComparison.Ordinal))
+                    {
+                        return index;
+                    }
+
+                    if (line.Length > 0)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            // summary 설명 자체에 일반 주석·빈 줄·별도 구분선이 들어가면 연속 문서화 블록이 아니다.
+            for (int index = open + 1; index < close; index++)
+            {
+                if (!lines[index].Line.TrimStart().StartsWith("///", StringComparison.Ordinal))
+                {
+                    return index;
+                }
+            }
+
+            // 첫 하단 구분선 이후에 param·typeparam·returns 등이 다시 나오면 구분선이 너무 이르다.
+            bool foundBottom = false;
+            for (int index = close + 1; index < lines.Count; index++)
+            {
+                string line = lines[index].Line.Trim();
+                if (IsSeparator(line))
+                {
+                    if (foundBottom)
+                    {
+                        return index;
+                    }
+
+                    foundBottom = true;
+                    continue;
+                }
+
+                if (line.StartsWith("///", StringComparison.Ordinal))
+                {
+                    if (foundBottom)
+                    {
+                        return index;
+                    }
+
+                    continue;
+                }
+            }
+
+            return -1;
+        }
+
+        // ------------------------------------------------------------
+        /// <summary>
+        /// summary 뒤에 추가된 XML 문서 주석을 건너뛰고 하단 구분선을 찾는다.
+        /// </summary>
+        // ------------------------------------------------------------
+        private static string FindBottomSeparator(IReadOnlyList<(string Line, int Offset)> lines, int start, out bool adjacent)
+        {
+            adjacent = true;
+            for (int index = start; index < lines.Count; index++)
+            {
+                string line = lines[index].Line.Trim();
+                if (IsSeparator(line))
+                {
+                    return line;
+                }
+
+                if (line.StartsWith("///", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (line.Length == 0)
+                {
+                    adjacent = false;
+                    continue;
+                }
+
+                break;
+            }
+
+            adjacent = false;
+            return string.Empty;
+        }
+
+        // ------------------------------------------------------------
+        /// <summary>
+        /// summary 앞에서 가장 가까운 구분선 주석을 찾는다.
         /// </summary>
         // ------------------------------------------------------------
         private static string FindSeparator(IReadOnlyList<(string Line, int Offset)> lines, int start, int step)

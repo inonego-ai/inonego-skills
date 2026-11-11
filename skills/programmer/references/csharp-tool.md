@@ -17,6 +17,8 @@ scripts/csharp-tool.ps1 review File.cs Assets\Scripts --format json --timing
 - `check`: 컨벤션 진단만 확인한다.
 - `review`: 구조와 컨벤션을 함께 확인하며 C# 수정 전후의 기본 명령으로 사용한다.
 
+XML 문서 주석 검사는 `public`의 `<summary>` 누락(`CSHARP-SUMMARY-001`)과, `<param>`·`<typeparam>`·`<returns>` 등 작성된 `///` 주석이 구분선 밖에 남거나 블록이 분리된 경우(`CSHARP-SUMMARY-010`)를 구분한다. 관련 규칙 ID는 의미 순서로 배치되며, 경계 검사를 추가하면서 기존 폭·줄바꿈 규칙 ID는 `011`·`012`·`013`으로 조정했다. `<summary>` 외 태그의 작성 자체를 강제하지 않는다.
+
 ## 옵션과 결과
 
 - `--format text|json`: 출력 형식을 선택한다. 기본값은 `text`다.
