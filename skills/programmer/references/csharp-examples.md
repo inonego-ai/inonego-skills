@@ -1,7 +1,6 @@
 # C# 코딩 규칙 예시
 
-이 문서는 `conventions/csharp.md`의 규칙을 한 파일에 적용한 참고 예시다.
-규칙 판단은 항상 원본 문서를 우선하고, 아래 코드는 전체 적용 형태를 보여주는 용도로만 사용한다.
+`conventions/csharp.md` 규칙을 한 파일에 적용한 참고 예시다. 규칙 판단은 원본 문서를 우선한다.
 
 ```csharp
 /* BLOCK_HEADER_BEGIN =======================================================================
@@ -219,15 +218,8 @@ namespace inonego
                 throw new InvalidOperationException("값이 설정되어 있지 않습니다.");
             }
 
-            // 생성 직후에는 아직 활성화하지 않고, 후속 초기화가 끝난 뒤 공개한다.
+            // 생성 직후에는 활성화하지 않고 후속 초기화가 끝난 뒤 공개한다.
             var spawnable = Instantiate(value);
-            var hasError = false;
-
-            // 실패 시 생성된 객체를 남기지 않도록 같은 흐름 안에서 정리한다.
-            if (hasError)
-            {
-                DespawnInternal(spawnable);
-            }
 
             // 외부 구독자가 활성화 직전 상태를 조정할 수 있도록 먼저 알린다.
             OnBeforeSpawn(spawnable);
@@ -235,16 +227,6 @@ namespace inonego
 
             // 활성화 완료 후 최종 상태를 외부에 전파한다.
             OnSpawnComplete?.Invoke(this, spawnable);
-        }
-
-        // ------------------------------------------------------------
-        /// <summary>
-        /// 생성한 객체를 정리한다.
-        /// </summary>
-        // ------------------------------------------------------------
-        public void Despawn()
-        {
-            // 생성된 객체의 외부 공개 상태를 종료하고 정리한다.
         }
 
     #endregion
