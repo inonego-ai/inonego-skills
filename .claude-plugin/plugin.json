@@ -11,6 +11,7 @@
     "./skills/align",
     "./skills/dev-unity",
     "./skills/chatgpt-share-reader",
-    "./skills/engineering-review"
+    "./skills/engineering-review",
+    "./skills/xeri"
   ]
 }
