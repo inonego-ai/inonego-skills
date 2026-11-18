@@ -1,6 +1,6 @@
 /* BLOCK_HEADER_BEGIN =======================================================================
 파일명 : NamingRule.cs
-수정일 : 2026-09-17
+수정일 : 2026-11-19
 
 # 설명
 기계적으로 확인 가능한 PascalCase와 camelCase 표기를 검사한다.
@@ -82,13 +82,41 @@ namespace Inonego.Skills.CSharpTool
         // ------------------------------------------------------------
         private static bool IsPascalDeclaration(DeclarationDescriptor declaration)
         {
-            if (declaration.Node is EventFieldDeclarationSyntax || FollowsExternalNameContract(declaration))
+            if
+            (
+                declaration.Node is EventFieldDeclarationSyntax ||
+                FollowsExternalNameContract(declaration) ||
+                UsesEscapedKeywordName(declaration)
+            )
             {
                 return false;
             }
 
             return declaration.Kind is "class" or "struct" or "enum" or "record" or "record struct"
                 or "delegate" or "enum member" or "property" or "event" or "method" or "local function";
+        }
+
+        // --------------------------------------------------------------------------------
+        /// <summary>
+        /// `@new`처럼 C# 예약어를 `@`로 이스케이프해 키워드를 의도적으로 흉내 낸 이름인지 확인한다.
+        /// </summary>
+        // --------------------------------------------------------------------------------
+        private static bool UsesEscapedKeywordName(DeclarationDescriptor declaration)
+        {
+            SyntaxToken identifier = declaration.Node switch
+            {
+                BaseTypeDeclarationSyntax type => type.Identifier,
+                DelegateDeclarationSyntax @delegate => @delegate.Identifier,
+                EnumMemberDeclarationSyntax enumMember => enumMember.Identifier,
+                PropertyDeclarationSyntax property => property.Identifier,
+                EventDeclarationSyntax @event => @event.Identifier,
+                MethodDeclarationSyntax method => method.Identifier,
+                LocalFunctionStatementSyntax localFunction => localFunction.Identifier,
+                _ => default,
+            };
+
+            return identifier.Text.StartsWith("@", StringComparison.Ordinal)
+                && SyntaxFacts.GetKeywordKind(identifier.ValueText) != SyntaxKind.None;
         }
 
         // --------------------------------------------------------------------------------
